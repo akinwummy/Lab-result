@@ -1,10 +1,6 @@
 from flask import Flask, request, render_template_string
 import psycopg2
 import os
-from dotenv import load_dotenv
-
-# Load environment variables for local testing
-load_dotenv()
 
 app = Flask(__name__)
 
@@ -12,11 +8,11 @@ app = Flask(__name__)
 def get_db_connection():
     try:
         conn = psycopg2.connect(
-            host=os.getenv("DB_HOST"),
-            database=os.getenv("DB_NAME"),
-            user=os.getenv("DB_USER"),
-            password=os.getenv("DB_PASSWORD"),
-            port=int(os.getenv("DB_PORT", 5432)),
+            host=os.environ["DB_HOST"],
+            database=os.environ["DB_NAME"],
+            user=os.environ["DB_USER"],
+            password=os.environ["DB_PASSWORD"],
+            port=int(os.environ.get("DB_PORT", 5432)),
             sslmode="require"
         )
         print("✅ Database connection established.")
@@ -24,7 +20,6 @@ def get_db_connection():
     except Exception as e:
         print("❌ Database connection failed:", e)
         return None
-
 
 # --- HTML Template ---
 HTML_TEMPLATE = """
@@ -47,7 +42,6 @@ HTML_TEMPLATE = """
 {% endif %}
 """
 
-
 # --- Home Route ---
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -64,7 +58,7 @@ def index():
         if conn:
             cur = conn.cursor()
             try:
-                # Text comparison with trimming spaces
+                # Text comparison, trim spaces
                 cur.execute("""
                     SELECT student_name, matric_no, ca, exam, total
                     FROM public.student_results
@@ -88,28 +82,36 @@ def index():
                     "total": row[4]
                 }
         else:
-            print("❌ Unable to connect to database — check /debug route for details.")
+            print("❌ Unable to connect to database — check /env and /debug routes.")
 
     return render_template_string(HTML_TEMPLATE, result=result, searched=searched, matric_no=matric_no)
 
-
-# --- Debug Route to Test DB Connection ---
+# --- Debug route for DB connection ---
 @app.route('/debug')
 def debug_conn():
     try:
-        conn = psycopg2.connect(
-            host=os.getenv("DB_HOST"),
-            database=os.getenv("DB_NAME"),
-            user=os.getenv("DB_USER"),
-            password=os.getenv("DB_PASSWORD"),
-            port=int(os.getenv("DB_PORT", 5432)),
-            sslmode="require"
-        )
-        conn.close()
-        return "✅ Connected!"
+        conn = get_db_connection()
+        if conn:
+            conn.close()
+            return "✅ Connected!"
+        else:
+            return "❌ Could not connect to database."
     except Exception as e:
         return f"❌ Connection failed: {e}"
 
+# --- Check environment variables ---
+@app.route('/env')
+def show_env():
+    try:
+        return (
+            f"Host={os.environ['DB_HOST']}, "
+            f"DB={os.environ['DB_NAME']}, "
+            f"User={os.environ['DB_USER']}, "
+            f"Password={'***' if os.environ['DB_PASSWORD'] else None}, "
+            f"Port={os.environ.get('DB_PORT', 'None')}"
+        )
+    except KeyError as e:
+        return f"❌ Missing environment variable: {e}"
 
 # --- Temporary route to check stored matric numbers ---
 @app.route('/check')
@@ -123,7 +125,6 @@ def check_db():
     cur.close()
     conn.close()
     return f"Sample matric numbers: {sample}"
-
 
 # --- App Runner ---
 if __name__ == '__main__':
