@@ -8,7 +8,7 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Database connection function using DATABASE_URL
+# --- Database Connection ---
 def get_db_connection():
     DATABASE_URL = os.getenv("DATABASE_URL")
 
@@ -24,7 +24,8 @@ def get_db_connection():
         print("❌ Database connection failed:", e)
         return None
 
-# Simple HTML template
+
+# --- HTML Template ---
 HTML_TEMPLATE = """
 <!doctype html>
 <title>Student Results Lookup</title>
@@ -45,6 +46,8 @@ HTML_TEMPLATE = """
 {% endif %}
 """
 
+
+# --- Home Route ---
 @app.route('/', methods=['GET', 'POST'])
 def index():
     result = None
@@ -54,17 +57,26 @@ def index():
     if request.method == 'POST':
         matric_no = request.form['matric_no'].strip()
         searched = True
+        print(f"🔍 Searching for matric number: {matric_no}")
 
         conn = get_db_connection()
         if conn:
             cur = conn.cursor()
-            cur.execute(
-                "SELECT student_name, matric_no, ca, exam, total FROM student_results WHERE matric_no = %s",
-                (matric_no,)
-            )
-            row = cur.fetchone()
-            cur.close()
-            conn.close()
+            try:
+                # Use text cast to avoid type mismatch and explicitly query from 'public' schema
+                cur.execute("""
+                    SELECT student_name, matric_no, ca, exam, total
+                    FROM public.student_results
+                    WHERE matric_no::text = %s
+                """, (matric_no,))
+                row = cur.fetchone()
+                print("🧾 Query result:", row)
+            except Exception as e:
+                print("⚠️ Query failed:", e)
+                row = None
+            finally:
+                cur.close()
+                conn.close()
 
             if row:
                 result = {
@@ -80,5 +92,23 @@ def index():
     return render_template_string(HTML_TEMPLATE, result=result, searched=searched, matric_no=matric_no)
 
 
+# --- Debug Route to Test DB Connection ---
+@app.route('/testdb')
+def testdb():
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return "❌ Could not connect to database."
+        cur = conn.cursor()
+        cur.execute("SELECT current_database();")
+        dbname = cur.fetchone()[0]
+        cur.close()
+        conn.close()
+        return f"✅ Connected successfully to database: {dbname}"
+    except Exception as e:
+        return f"❌ Database connection error: {e}"
+
+
+# --- App Runner ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
