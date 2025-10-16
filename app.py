@@ -63,11 +63,11 @@ def index():
         if conn:
             cur = conn.cursor()
             try:
-                # Text comparison with trimming spaces
+                # Use BTRIM to remove leading/trailing spaces from DB values
                 cur.execute("""
                     SELECT student_name, matric_no, ca, exam, total
                     FROM public.student_results
-                    WHERE TRIM(matric_no) = %s
+                    WHERE BTRIM(matric_no) = %s
                 """, (matric_no,))
                 row = cur.fetchone()
                 print("🧾 Query result:", row)
@@ -109,11 +109,6 @@ def testdb():
         return f"❌ Database connection error: {e}"
 
 
-# --- App Runner ---
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
-
-
 # --- Temporary route to check stored matric numbers ---
 @app.route('/check')
 def check_db():
@@ -127,3 +122,7 @@ def check_db():
     conn.close()
     return f"Sample matric numbers: {sample}"
 
+
+# --- App Runner ---
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
