@@ -112,3 +112,18 @@ def testdb():
 # --- App Runner ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
+
+
+# --- Temporary route to check stored matric numbers ---
+@app.route('/check')
+def check_db():
+    conn = get_db_connection()
+    if not conn:
+        return "❌ Cannot connect"
+    cur = conn.cursor()
+    cur.execute("SELECT matric_no FROM public.student_results LIMIT 10;")
+    sample = cur.fetchall()
+    cur.close()
+    conn.close()
+    return f"Sample matric numbers: {sample}"
+
