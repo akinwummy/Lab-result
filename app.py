@@ -3,24 +3,32 @@ import psycopg2
 import os
 from dotenv import load_dotenv
 
+# Load environment variables for local testing (optional)
+load_dotenv()
+
 app = Flask(__name__)
 
-# Database connection function using environment variables
+# Database connection function using DATABASE_URL
 def get_db_connection():
-    conn = psycopg2.connect(
-        dbname=os.environ.get("DB_NAME"),
-        user=os.environ.get("DB_USER"),
-        password=os.environ.get("DB_PASSWORD"),
-        host=os.environ.get("DB_HOST"),
-        port=os.environ.get("DB_PORT", 5432)
-    )
-    return conn
+    DATABASE_URL = os.getenv("DATABASE_URL")
+
+    # psycopg2 prefers postgres:// instead of postgresql://
+    if DATABASE_URL and DATABASE_URL.startswith("postgresql://"):
+        DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgres://", 1)
+
+    try:
+        conn = psycopg2.connect(DATABASE_URL, sslmode='require')  # Supabase requires SSL
+        print("✅ Database connection established.")
+        return conn
+    except Exception as e:
+        print("❌ Database connection failed:", e)
+        return None
 
 # Simple HTML template
 HTML_TEMPLATE = """
 <!doctype html>
 <title>Student Results Lookup</title>
-<h2>Enter your Matric Number to view your EEG 346 result for the 2024/2025 session </h2>
+<h2>Enter your Matric Number to view your EEG 346 result for the 2024/2025 session</h2>
 <form method="POST">
   <input type="text" name="matric_no" placeholder="Matric Number" required>
   <input type="submit" value="Check Results">
@@ -28,9 +36,9 @@ HTML_TEMPLATE = """
 {% if result %}
   <h3>Result for {{ result.student_name }} ({{ result.matric_no }})</h3>
   <ul>
-  <li> Lab score <em>/30</em>: {{ result.ca }}</li>
-  <li>Exam <em>/70</em>: {{ result.exam }}</li>
-  <li>Total <em>/100</em>: {{ result.total }}</li>
+    <li>Lab score <em>/30</em>: {{ result.ca }}</li>
+    <li>Exam <em>/70</em>: {{ result.exam }}</li>
+    <li>Total <em>/100</em>: {{ result.total }}</li>
   </ul>
 {% elif searched %}
   <p><strong>No results found for Matric Number: {{ matric_no }}</strong></p>
@@ -48,22 +56,29 @@ def index():
         searched = True
 
         conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("SELECT student_name, matric_no, ca, exam, total FROM student_results WHERE matric_no = %s", (matric_no,))
-        row = cur.fetchone()
-        cur.close()
-        conn.close()
+        if conn:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT student_name, matric_no, ca, exam, total FROM student_results WHERE matric_no = %s",
+                (matric_no,)
+            )
+            row = cur.fetchone()
+            cur.close()
+            conn.close()
 
-        if row:
-            result = {
-                "student_name": row[0],
-                "matric_no": row[1],
-                "ca": row[2],
-                "exam": row[3],
-                "total": row[4]
-            }
+            if row:
+                result = {
+                    "student_name": row[0],
+                    "matric_no": row[1],
+                    "ca": row[2],
+                    "exam": row[3],
+                    "total": row[4]
+                }
+        else:
+            print("❌ Unable to connect to database — please verify DATABASE_URL or Supabase connectivity.")
 
     return render_template_string(HTML_TEMPLATE, result=result, searched=searched, matric_no=matric_no)
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
