@@ -3,21 +3,22 @@ import psycopg2
 import os
 from dotenv import load_dotenv
 
-# Load environment variables for local testing (optional)
+# Load environment variables for local testing
 load_dotenv()
 
 app = Flask(__name__)
 
 # --- Database Connection ---
 def get_db_connection():
-    DATABASE_URL = os.getenv("DATABASE_URL")
-
-    # psycopg2 prefers postgres:// instead of postgresql://
-    if DATABASE_URL and DATABASE_URL.startswith("postgresql://"):
-        DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgres://", 1)
-
     try:
-        conn = psycopg2.connect(DATABASE_URL, sslmode='require')  # Supabase requires SSL
+        conn = psycopg2.connect(
+            host=os.getenv("DB_HOST"),
+            database=os.getenv("DB_NAME"),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASSWORD"),
+            port=int(os.getenv("DB_PORT", 5432)),
+            sslmode="require"
+        )
         print("✅ Database connection established.")
         return conn
     except Exception as e:
@@ -63,7 +64,7 @@ def index():
         if conn:
             cur = conn.cursor()
             try:
-                # Use BTRIM to remove leading/trailing spaces from DB values
+                # Text comparison with trimming spaces
                 cur.execute("""
                     SELECT student_name, matric_no, ca, exam, total
                     FROM public.student_results
@@ -87,26 +88,27 @@ def index():
                     "total": row[4]
                 }
         else:
-            print("❌ Unable to connect to database — please verify DATABASE_URL or Supabase connectivity.")
+            print("❌ Unable to connect to database — check /debug route for details.")
 
     return render_template_string(HTML_TEMPLATE, result=result, searched=searched, matric_no=matric_no)
 
 
 # --- Debug Route to Test DB Connection ---
-@app.route('/testdb')
-def testdb():
+@app.route('/debug')
+def debug_conn():
     try:
-        conn = get_db_connection()
-        if not conn:
-            return "❌ Could not connect to database."
-        cur = conn.cursor()
-        cur.execute("SELECT current_database();")
-        dbname = cur.fetchone()[0]
-        cur.close()
+        conn = psycopg2.connect(
+            host=os.getenv("DB_HOST"),
+            database=os.getenv("DB_NAME"),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASSWORD"),
+            port=int(os.getenv("DB_PORT", 5432)),
+            sslmode="require"
+        )
         conn.close()
-        return f"✅ Connected successfully to database: {dbname}"
+        return "✅ Connected!"
     except Exception as e:
-        return f"❌ Database connection error: {e}"
+        return f"❌ Connection failed: {e}"
 
 
 # --- Temporary route to check stored matric numbers ---
