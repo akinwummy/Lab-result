@@ -20,7 +20,7 @@ def get_db_connection():
 HTML_TEMPLATE = """
 <!doctype html>
 <title>Student Results Lookup</title>
-<h2>Enter your Matric Number to view your EEG 326 score for the 2024/2025 session </h2>
+<h2>Enter your Matric Number to view your EEG 346 result for the 2024/2025 session </h2>
 <form method="POST">
   <input type="text" name="matric_no" placeholder="Matric Number" required>
   <input type="submit" value="Check Results">
@@ -28,8 +28,8 @@ HTML_TEMPLATE = """
 {% if result %}
   <h3>Result for {{ result.student_name }} ({{ result.matric_no }})</h3>
   <ul>
-  <li> CA <em>/40</em>: {{ result.ca }}</li>
-  <li>Exam <em>/60</em>: {{ result.exam }}</li>
+  <li> Lab score <em>/30</em>: {{ result.ca }}</li>
+  <li>Exam <em>/70</em>: {{ result.exam }}</li>
   <li>Total <em>/100</em>: {{ result.total }}</li>
   </ul>
 {% elif searched %}
