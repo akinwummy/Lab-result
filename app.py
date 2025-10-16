@@ -59,43 +59,35 @@ def index():
         searched = True
         print(f"🔍 Searching for matric number: {matric_no}")
 
-        # Convert form input to integer for numeric comparison
-        try:
-            matric_no_numeric = int(matric_no)
-        except ValueError:
-            matric_no_numeric = None
-            print("⚠️ Invalid matric number format.")
+        conn = get_db_connection()
+        if conn:
+            cur = conn.cursor()
+            try:
+                # Text comparison with trimming spaces
+                cur.execute("""
+                    SELECT student_name, matric_no, ca, exam, total
+                    FROM public.student_results
+                    WHERE TRIM(matric_no) = %s
+                """, (matric_no,))
+                row = cur.fetchone()
+                print("🧾 Query result:", row)
+            except Exception as e:
+                print("⚠️ Query failed:", e)
+                row = None
+            finally:
+                cur.close()
+                conn.close()
 
-        if matric_no_numeric is not None:
-            conn = get_db_connection()
-            if conn:
-                cur = conn.cursor()
-                try:
-                    # Use numeric comparison
-                    cur.execute("""
-                        SELECT student_name, matric_no, ca, exam, total
-                        FROM public.student_results
-                        WHERE matric_no = %s
-                    """, (matric_no_numeric,))
-                    row = cur.fetchone()
-                    print("🧾 Query result:", row)
-                except Exception as e:
-                    print("⚠️ Query failed:", e)
-                    row = None
-                finally:
-                    cur.close()
-                    conn.close()
-
-                if row:
-                    result = {
-                        "student_name": row[0],
-                        "matric_no": row[1],
-                        "ca": row[2],
-                        "exam": row[3],
-                        "total": row[4]
-                    }
-            else:
-                print("❌ Unable to connect to database — please verify DATABASE_URL or Supabase connectivity.")
+            if row:
+                result = {
+                    "student_name": row[0],
+                    "matric_no": row[1],
+                    "ca": row[2],
+                    "exam": row[3],
+                    "total": row[4]
+                }
+        else:
+            print("❌ Unable to connect to database — please verify DATABASE_URL or Supabase connectivity.")
 
     return render_template_string(HTML_TEMPLATE, result=result, searched=searched, matric_no=matric_no)
 
